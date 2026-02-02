@@ -55,7 +55,7 @@ class Network:
         """
         Builds an object of type Graph from the network, by ignoring the fatigue coefficient. 
         """
-        # TODO: implement the method
-        raise NotImplementedError
-
-
+        graph = {}
+        for sommet, voisins in self._roads.items():
+            graph[sommet] = [(a,b) for a,b,c in voisins]
+        return Graph(graph)
