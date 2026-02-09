@@ -28,6 +28,34 @@ class Graph:
         if node not in self._edges:
             return []
         return self._edges[node]
+    
+    def shortest_path(self, start):
+        """
+        Dijkstra's algorithm as a method of the Graph class.
+        Returns a dictionary of shortest distances from 'start'.
+        """
+        # Initialisation : distance 0 pour le départ, l'infini pour le reste
+        # On utilise un dictionnaire par défaut pour gérer les nœuds inconnus
+        distances = {node: float('inf') for node in self._edges}
+        distances[start] = 0
+            
+        # File de priorité : (poids_cumulé, sommet)
+        priority_queue = [(0, start)]
+            
+        while priority_queue:
+            current_dist, current_node = heapq.heappop(priority_queue)
 
-    def shortest_path(self,edges) : 
-        
+            # Si on a déjà trouvé un chemin plus court pour ce nœud, on ignore
+            if current_dist > distances.get(current_node, float('inf')):
+                continue
+
+            # Exploration des voisins via la méthode interne
+            for neighbor, weight in self.neighbours(current_node):
+                distance = current_dist + weight
+
+                # Mise à jour si un chemin plus court est découvert
+                if distance < distances.get(neighbor, float('inf')):
+                    distances[neighbor] = distance
+                    heapq.heappush(priority_queue, (distance, neighbor))
+            
+        return distances
