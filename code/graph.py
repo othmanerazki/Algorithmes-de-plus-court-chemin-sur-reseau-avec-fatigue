@@ -30,7 +30,7 @@ class Graph:
         return self._edges[node]
     
     def shortest_path(self, start):
-        """
+        """    
         Dijkstra's algorithm as a method of the Graph class.
         Returns a dictionary of shortest distances from 'start'.
         """
