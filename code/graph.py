@@ -59,3 +59,26 @@ class Graph:
                     heapq.heappush(priority_queue, (distance, neighbor))
             
         return distances
+
+
+    def build_extended_graph(self, graphe):
+    graphe_etendue = {}
+    #majorer Fmax
+    Fmax = sum(sommet.fatigue for sommet in self.graphe)
+    for sommet in self.graphe:
+        for F in range(Fmax + 1):
+            u = (sommet, F)
+            graphe_etendue[u] = []
+        
+    for sommet in self.graphe:
+        for F in range(Fmax + 1):
+            u = (sommet, F)
+                
+            for neighbor, length, fatigue_increase in self.graphe[sommet]:
+                new_F = F + fatigue_increase
+                if new_F > Fmax:
+                    continue
+                v = (neighbor, new_F)
+                cost = length * (1 + F)
+                graphe_etendue[u].append((v,cost))
+    return Graph(graphe_etendue)
