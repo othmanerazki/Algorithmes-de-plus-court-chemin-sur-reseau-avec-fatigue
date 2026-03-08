@@ -5,5 +5,9 @@ from graph import Graph
 network_file = "../examples/small.txt"
 network = Network.from_file(network_file)
 
+# Construire le graphe simple
+graph = network.build_simple_graph()
 
-a
+# Calculer le plus court chemin
+distances, precedent = graph.shortest_path(dep)
+

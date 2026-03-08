@@ -59,3 +59,27 @@ class Network:
         for sommet, voisins in self._roads.items():
             graph[sommet] = [(a,b) for a,b,c in voisins]
         return Graph(graph)
+
+
+    def build_graph_implicit(network):
+    
+    # Calculer la fatigue max théorique
+    Fmax = sum(f for voisins in network._roads.values() for (_, _, f) in voisins)
+
+    def neighbours_fn(state):
+        #state = (current_node, current_fatigue)
+        #retourne les voisins sous forme [(neighbor_state, cost), ...]
+        node, F = state
+        result = []
+
+        for neighbor, length, fatigue in network._roads.get(node, []):
+            new_F = F + fatigue
+            if new_F > Fmax:
+                continue
+            neighbor_state = (neighbor, new_F)
+            cost = length * (1 + F)
+            result.append((neighbor_state, cost))
+
+        return result
+
+    return GraphImplicit(neighbours_fn)
