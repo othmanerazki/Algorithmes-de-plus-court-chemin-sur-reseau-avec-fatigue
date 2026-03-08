@@ -1,38 +1,102 @@
 import heapq
 """
-This is the graph module. It contains the classes Graph and GraphImplicit
+Ce module implémente les structures de graphes et les algorithmes associés.
+Il contient deux classes principales : Graph et GraphImplicit.
+
+Classes
+-------
+Graph :
+    Représente un graphe orienté pondéré sous forme de liste d'adjacence.
+    Fournit les algorithmes de plus court chemin (Dijkstra naïf et optimisé)
+    ainsi qu'une méthode de construction de graphe étendu tenant compte de la fatigue.
+
+GraphImplicit :
+    Hérite de Graph. Représente un graphe dont les voisins sont calculés
+    à la volée via une fonction passée en paramètre, sans stocker explicitement
+    la liste d'adjacence.
 """
 
 
 class Graph:
     """
-    A minimal class for directed weighted graph represented as adjacency list. 
-    
-    Attributes: 
-    -----------
-    edges: dict
-        A dictionary that contains the list of neighbors of each node with its weight.
-        Ex: edges = {v0: [(v1, 21), (v2, 12)], 
-                     v1: [(v0, 74), (v2, 32)], 
-                     ...}
+    Classe minimale représentant un graphe orienté pondéré sous forme de liste d'adjacence.
 
-    Methods: 
+    Attributs
+    ---------
+    _edges : dict
+        Dictionnaire associant à chaque sommet la liste de ses voisins avec le poids
+        de l'arête correspondante.
+        Exemple :
+            edges = {
+                sommet_0: [(sommet_1, 21), (sommet_2, 12)],
+                sommet_1: [(sommet_0, 74), (sommet_2, 32)],
+                ...
+            }
+
+    Méthodes
     --------
-    neighbours(self, node): 
-        Returns the list of all neighbors of a node
+    neighbours(noeud) :
+        Retourne la liste des voisins (et leurs poids) d'un sommet donné.
+    shortest_path_naïve(depart) :
+        Implémentation naïve de l'algorithme de Dijkstra (sans file de priorité).
+    shortest_path(depart) :
+        Implémentation optimisée de l'algorithme de Dijkstra (avec tas binaire).
+    build_extended_graph(reseau) :
+        Construit le graphe étendu intégrant la fatigue accumulée comme dimension d'état.
     """
 
     def __init__(self, edges):
+        """
+        Initialise le graphe avec une liste d'adjacence.
+
+        Paramètres
+        ----------
+        edges : dict
+            Dictionnaire de la forme {sommet: [(voisin, poids), ...]}.
+        """
         self._edges = edges
 
     def neighbours(self, node):
+        """
+        Retourne la liste des voisins d'un sommet avec leurs poids.
+
+        Paramètres
+        ----------
+        node : sommet
+            Le sommet dont on veut connaître les voisins.
+
+        Retourne
+        --------
+        list
+            Liste de tuples (voisin, poids). Retourne une liste vide si le sommet
+            n'existe pas dans le graphe.
+        """
         if node not in self._edges:
             return []
         return self._edges[node]
     
-    #On propose d'abord une version naïve de l'algorithme sans file de priorité :
     def shortest_path_naïve(self, dep):
-        #Initialisation des deux dictionnaire et de la liste des sommets non visités 
+        """
+        Version naïve de l'algorithme de Dijkstra sans file de priorité.
+
+        À chaque itération, le sommet non visité de distance minimale est sélectionné
+        par un parcours linéaire (complexité O(n) par itération), ce qui donne une
+        complexité globale de O(n² + m) où n est le nombre de sommets et m le nombre
+        d'arêtes.
+
+        Paramètres
+        ----------
+        dep : sommet
+            Le sommet de départ depuis lequel calculer les plus courts chemins.
+
+        Retourne
+        --------
+        distance : dict
+            Dictionnaire {sommet: distance_minimale_depuis_dep}.
+        precedent : dict
+            Dictionnaire {sommet: sommet_precedent_sur_le_plus_court_chemin}.
+        """
+        # Initialisation des deux dictionnaires et de la liste des sommets non visités
         distance = {}
         precedent = {}
         non_visite = []
@@ -44,17 +108,17 @@ class Graph:
         distance[dep] = 0 
         
         while len(non_visite) != 0:
-            #On extrait le sommet de dsitance minimal au sommet de depart 
-            # qui n'a pas encore été visité 
+            # On extrait le sommet de distance minimale au sommet de départ
+            # qui n'a pas encore été visité
             sommet = min(non_visite, key = lambda x: distance[x])
-            #On le retire ensuite de la liste des sommets non visité 
+            # On le retire ensuite de la liste des sommets non visités
             non_visite.remove(sommet)
             
             for voisin, poids in self._edges[sommet]:
-                #Calcul de la distance du voisin à sommet 
+                # Calcul de la distance du voisin depuis sommet
                 total = distance[sommet] + poids
-                #Si cette distance est plus courte que la distance actuellement 
-                # stocké on la met à jour dans le dictionnaire distance
+                # Si cette distance est plus courte que la distance actuellement
+                # stockée, on la met à jour dans le dictionnaire distance
                 if total < distance[voisin]:
                     distance[voisin] = total 
                     precedent[voisin] = sommet 
@@ -63,9 +127,23 @@ class Graph:
     
     
     def shortest_path(self, start):
-        """    
-        Dijkstra's algorithm as a method of the Graph class.
-        Returns a dictionary of shortest distances from 'start'.
+        """
+        Implémentation optimisée de l'algorithme de Dijkstra avec file de priorité (tas binaire).
+
+        Utilise le module heapq pour extraire en O(log n) le sommet de distance minimale
+        à chaque étape. La complexité globale est O((n + m) log n) où n est le nombre
+        de sommets et m le nombre d'arêtes.
+
+        Paramètres
+        ----------
+        start : sommet
+            Le sommet de départ depuis lequel calculer les plus courts chemins.
+
+        Retourne
+        --------
+        distances : dict
+            Dictionnaire {sommet: distance_minimale_depuis_start}.
+            Les sommets non atteignables conservent la valeur float('inf').
         """
         # Initialisation : distance 0 pour le départ, l'infini pour le reste
         # On utilise un dictionnaire par défaut pour gérer les nœuds inconnus
@@ -95,7 +173,41 @@ class Graph:
 
 
     def build_extended_graph(self, network):
-    
+        """
+        Construit un graphe étendu intégrant la fatigue accumulée comme dimension d'état.
+
+        Chaque nœud du graphe étendu est un couple (sommet, fatigue_accumulée).
+        Le coût d'une arête dans le graphe étendu est : longueur × (1 + fatigue_courante),
+        ce qui pénalise les chemins où la fatigue est élevée.
+
+        La fatigue maximale (Fmax) est calculée comme la somme de toutes les fatigues
+        présentes dans le réseau. Tout état dont la fatigue dépasse Fmax est ignoré.
+
+        Analyse de complexité
+        ---------------------
+        Soit :
+            n     = |V|    nombre de sommets du graphe original
+            m     = |E|    nombre d'arêtes du graphe original
+            Fmax  =        borne maximale de fatigue considérée
+
+        - Nombre de sommets du graphe étendu : |V'| = n × (Fmax + 1)
+        - Nombre d'arêtes du graphe étendu   : |E'| = O(m × Fmax)
+        - Complexité de construction          : O(m × Fmax)
+        - Complexité de Dijkstra sur le graphe étendu :
+            O((|V'| + |E'|) × log|V'|) = O(m × Fmax × log(n × Fmax))
+
+        Paramètres
+        ----------
+        network : objet réseau
+            Objet possédant un attribut `_roads` de la forme :
+            {sommet: [(voisin, longueur, fatigue), ...]}.
+
+        Retourne
+        --------
+        Graph
+            Une instance de Graph représentant le graphe étendu, dont les sommets
+            sont des tuples (sommet_original, fatigue_accumulée).
+        """
         extended_edges = {}
         
         # Calcul de la fatigue max : somme de toutes les fatigues dans le network
@@ -105,41 +217,68 @@ class Graph:
             for F in range(Fmax + 1):
                 u = (node, F)
                 extended_edges[u] = {}
-                #On extrait des voisins de node leur distance ainsi que leur fatigue 
+                # On extrait des voisins de node leur distance ainsi que leur fatigue
                 for neighbor, length, fatigue in network._roads[node]:
-                    #On calcul la fatigue accumulé 
+                    # On calcule la fatigue accumulée
                     new_F = F + fatigue
-                    #Si cette fatigue dépasse la fatigue max alors on sait que ce 
-                    #sommet n'existera pas donc on ne le considère pas
+                    # Si cette fatigue dépasse la fatigue max alors on sait que ce
+                    # sommet n'existera pas, donc on ne le considère pas
                     if new_F > Fmax:
                         continue
                     v = (neighbor, new_F)
-                    #On calcule le coût, c'est à dire la distance de node 
-                    #à neighbor en tenant compte de la fatigue actuelle
+                    # On calcule le coût, c'est-à-dire la distance de node
+                    # à neighbor en tenant compte de la fatigue actuelle
                     cost = length * (1 + F)  
                     extended_edges[u][v] = cost             
         return Graph(extended_edges)
 
 
-#Analyse de complexité :
-#On note n = |V| le nombre de sommets du graphe original, m = |E| le nombre d’arêtes du graphe original et Fmax la borne maximale de la fatigue considérée dans le graphe étendu.
-#Dans la formulation du graphe étendu, on encode l’état du problème sous la forme d’un couple (sommet, fatigue_accumulée). Ainsi, chaque sommet du graphe original peut être associé à Fmax + 1 états possibles correspondant aux différents niveaux de fatigue. Le nombre de sommets du graphe étendu est donc :
-#|V'| = n (Fmax + 1)
-#Concernant le nombre d’arêtes du graphe étendu, pour chaque état du graphe étendu, on explore les voisins du sommet correspondant. En moyenne, le degré d’un sommet du graphe est proportionnel à m / n. Par conséquent, le nombre total d’arêtes du graphe étendu est de l’ordre :
-#|E'| = O(m Fmax)
-#La complexité de la méthode de construction du graphe étendu build_extended_graph consiste à parcourir tous les sommets du graphe original, toutes les valeurs possibles de fatigue ainsi que toutes les arêtes sortantes. La complexité de cette étape est donc :
-#O(m Fmax)
-#Pour la recherche du plus court chemin, on utilise l’algorithme de Dijkstra avec une file de priorité implémentée par un tas binaire. La complexité de Dijkstra dans ce cas est :
-#O((|V'| + |E'|) log |V'|)
-#En remplaçant par les tailles du graphe étendu, où |V'| = O(n Fmax) et |E'| = O(m Fmax), on obtient la complexité globale suivante :
-#O(m Fmax log (n Fmax))
-
 class GraphImplicit(Graph):
+    """
+    Graphe implicite dont les voisins sont générés à la volée par une fonction.
+
+    Hérite de Graph mais ne stocke pas de liste d'adjacence explicite.
+    Les voisins de chaque nœud sont calculés dynamiquement lors de l'exploration,
+    ce qui est utile pour les graphes de très grande taille ou infinis.
+
+    Attributs
+    ---------
+    _neighbours_function : callable
+        Fonction prenant un nœud en paramètre et retournant la liste de ses voisins
+        sous la forme [(voisin, poids), ...].
+
+    Méthodes
+    --------
+    neighbours(noeud) :
+        Retourne les voisins du nœud calculés à la volée par _neighbours_function.
+    """
 
     def __init__(self, neighbours_function):
-        
+        """
+        Initialise le graphe implicite avec une fonction de voisinage.
+
+        Paramètres
+        ----------
+        neighbours_function : callable
+            Fonction de la forme f(noeud) -> [(voisin, poids), ...].
+            Elle sera appelée dynamiquement lors de chaque exploration de voisins.
+        """
         self._neighbours_function = neighbours_function
 
     def neighbours(self, node):
-       #Retourne les voisins du noeud à la volée
+        """
+        Retourne les voisins du nœud calculés à la volée.
+
+        Paramètres
+        ----------
+        node : sommet
+            Le nœud dont on souhaite obtenir les voisins.
+
+        Retourne
+        --------
+        list
+            Liste de tuples (voisin, poids) générée dynamiquement
+            par la fonction _neighbours_function.
+        """
+        # Retourne les voisins du noeud à la volée
         return self._neighbours_function(node)
