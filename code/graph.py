@@ -1,3 +1,4 @@
+import heapq
 """
 This is the graph module. It contains the classes Graph and GraphImplicit
 """
@@ -30,13 +31,13 @@ class Graph:
         return self._edges[node]
     
     #On propose d'abord une version naïve de l'algorithme sans file de priorité :
-    def shortest_path_naïve(graphe, dep):
+    def shortest_path_naïve(self, dep):
         #Initialisation des deux dictionnaire et de la liste des sommets non visités 
         distance = {}
         precedent = {}
         non_visite = []
         
-        for sommet in graphe:
+        for sommet in self._edges:
             distance[sommet] = float('inf')
             non_visite.append(sommet)
             
@@ -49,17 +50,16 @@ class Graph:
             #On le retire ensuite de la liste des sommets non visité 
             non_visite.remove(sommet)
             
-            for voisin in graphe[sommet]:
+            for voisin, poids in self._edges[sommet]:
                 #Calcul de la distance du voisin à sommet 
-                total = distance[sommet] + graphe[sommet][voisin]
+                total = distance[sommet] + poids
                 #Si cette distance est plus courte que la distance actuellement 
                 # stocké on la met à jour dans le dictionnaire distance
                 if total < distance[voisin]:
                     distance[voisin] = total 
                     precedent[voisin] = sommet 
                 
-                
-    return distance, precedent 
+        return distance, precedent 
     
     
     def shortest_path(self, start):
@@ -96,30 +96,29 @@ class Graph:
 
     def build_extended_graph(self, network):
     
-    extended_edges = {}
-    
-    # Calcul de la fatigue max : somme de toutes les fatigues dans le network
-    Fmax = sum(f for voisins in network._roads.values() for (_, _, f) in voisins)
-    
-    for node in network._roads:
-        for F in range(Fmax + 1):
-            u = (node, F)
-            extended_edges[u] = {}
-            #On extrait des voisins de node leur distance ainsi que leur fatigue 
-            for neighbor, length, fatigue in network._roads[node]:
-                #On calcul la fatigue accumulé 
-                new_F = F + fatigue
-                #Si cette fatigue dépasse la fatigue max alors on sait que ce 
-                #sommet n'existera pas donc on ne le considère pas
-                if new_F > Fmax:
-                    continue
-                v = (neighbor, new_F)
-                #On calcule le coût, c'est à dire la distance de node 
-                #à neighbor en tenant compte de la fatigue actuelle
-                cost = length * (1 + F)  
-                extended_edges[u][v] = cost
-                
-    return Graph(extended_edges)
+        extended_edges = {}
+        
+        # Calcul de la fatigue max : somme de toutes les fatigues dans le network
+        Fmax = sum(f for voisins in network._roads.values() for (_, _, f) in voisins)
+        
+        for node in network._roads:
+            for F in range(Fmax + 1):
+                u = (node, F)
+                extended_edges[u] = {}
+                #On extrait des voisins de node leur distance ainsi que leur fatigue 
+                for neighbor, length, fatigue in network._roads[node]:
+                    #On calcul la fatigue accumulé 
+                    new_F = F + fatigue
+                    #Si cette fatigue dépasse la fatigue max alors on sait que ce 
+                    #sommet n'existera pas donc on ne le considère pas
+                    if new_F > Fmax:
+                        continue
+                    v = (neighbor, new_F)
+                    #On calcule le coût, c'est à dire la distance de node 
+                    #à neighbor en tenant compte de la fatigue actuelle
+                    cost = length * (1 + F)  
+                    extended_edges[u][v] = cost             
+        return Graph(extended_edges)
 
 
 #Analyse de complexité :
