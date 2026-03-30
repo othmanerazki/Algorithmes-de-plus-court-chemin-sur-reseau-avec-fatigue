@@ -46,3 +46,24 @@ distances = graphe.shortest_path(sommet_depart)
 # Récupération et affichage de la distance minimale jusqu'au sommet d'arrivée
 # Retourne None si le sommet d'arrivée n'est pas atteignable depuis le départ
 print("Résultat large-nofatigue.txt :", distances.get(reseau.end))
+
+# Partie 2.1 : Pruning Pareto 
+graphe_implicite = Network.build_graph_implicit(reseau)
+start_state = (reseau.start, 0)
+
+temps_pruning = graphe_implicite.shortest_path_with_pruning(start_state, reseau.end)
+print("Temps minimal (avec pruning Pareto) :", temps_pruning)
+
+# Partie 2.2 : A* 
+# Pré-traitement : Dijkstra inversé depuis vt sur le graphe simple
+graphe_inverse = reseau.build_reversed_simple_graph()
+h_values = graphe_inverse.shortest_path(reseau.end)  # distances brutes jusqu'à vt
+
+# Heuristique admissible : distance sans fatigue depuis le sommet courant jusqu'à vt
+def heuristic(state):
+    node, fatigue = state
+    # Si le sommet n'est pas atteignable dans le graphe inverse, heuristique = infini
+    return h_values.get(node, float('inf'))
+
+temps_astar = graphe_implicite.astar(start_state, reseau.end, heuristic)
+print("Temps minimal (A*) :", temps_astar)

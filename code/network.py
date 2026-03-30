@@ -177,3 +177,23 @@ class Network:
 
         # Retourne l'objet GraphImplicit utilisant la fonction de voisinage définie ci-dessus
         return GraphImplicit(neighbours_fn)
+
+    def build_reversed_simple_graph(self):
+    """
+    Construit le graphe simple inversé (arêtes retournées, sans fatigue).
+
+    Utile pour le pré-traitement de l'heuristique A* : en faisant tourner
+    Dijkstra depuis vt sur ce graphe inversé, on obtient pour chaque sommet
+    sa distance minimale (sans fatigue) jusqu'à vt.
+
+    Retourne
+    --------
+    Graph
+        Graphe simple dont les arêtes sont retournées (j → i au lieu de i → j).
+    """
+    reversed_graph = {}
+    for sommet, voisins in self._roads.items():
+        reversed_graph.setdefault(sommet, [])
+        for voisin, longueur, fatigue in voisins:
+            reversed_graph.setdefault(voisin, []).append((sommet, longueur))
+    return Graph(reversed_graph)

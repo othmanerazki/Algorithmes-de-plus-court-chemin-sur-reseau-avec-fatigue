@@ -282,3 +282,106 @@ class GraphImplicit(Graph):
         """
         # Retourne les voisins du noeud à la volée
         return self._neighbours_function(node)
+
+
+def shortest_path_with_pruning(self, start, end_node):
+    """
+    Idée : Dijkstra sur graphe étendu avec pruning des états Pareto-dominés.
+
+    Un état (sommet, fatigue) est Pareto-dominé si on a déjà visité ce sommet
+    avec une fatigue inférieure et un temps inférieur. On élimine alors cet état
+    car il ne peut pas mener à une solution optimale.
+    
+    Dans le pire cas (pas de pruning), on retrouve la complexité de Dijkstra
+    standard sur le graphe étendu : O((|V'| + |E'|) log |V'|).
+    En pratique, le pruning réduit significativement le nombre d'états explorés.
+
+    """
+    # best_for_node[sommet] = liste de (fatigue, temps) des états non dominés
+    # Un état (f2, t2) est dominé s'il existe (f1, t1) avec f1<=f2 et t1<=t2
+    best_for_node = {}
+
+    # File de priorité : (temps_cumulé, état)
+    priority_queue = [(0, start)]
+    distances = {start: 0}
+
+    while priority_queue:
+        current_time, current_state = heapq.heappop(priority_queue)
+
+        # Ignorer si on a trouvé mieux entre-temps
+        if current_time > distances.get(current_state, float('inf')):
+            continue
+
+        node, fatigue = current_state
+
+        # On vérifie si cet état est dominé par un état déjà connu pour ce sommet
+        pareto_front = best_for_node.get(node, [])
+        dominated = any(f <= fatigue and t <= current_time for f, t in pareto_front)
+        if dominated:
+            continue  # Cet état est Pareto-dominé, on l'élague
+
+        # Cet état n'est pas dominé : on l'ajoute au front de Pareto
+        # On retire aussi les anciens états que cet état domine
+        best_for_node[node] = [
+            (f, t) for f, t in pareto_front
+            if not (fatigue <= f and current_time <= t)
+        ]
+        best_for_node[node].append((fatigue, current_time))
+
+        # Exploration des voisins
+        for neighbor_state, weight in self.neighbours(current_state):
+            new_time = current_time + weight
+            if new_time < distances.get(neighbor_state, float('inf')):
+                distances[neighbor_state] = new_time
+                heapq.heappush(priority_queue, (new_time, neighbor_state))
+
+    # On cherche le meilleur temps parmi tous les états (end_node, *) atteints
+    best_time = float('inf')
+    for state, time in distances.items():
+        if state[0] == end_node:
+            best_time = min(best_time, time)
+    return best_time
+
+
+def astar(self, start, end_node, heuristic):
+    """
+
+    Idée : Combiner Dijkstra avec une heuristique admissible pour guider la recherche
+    vers le but, réduisant le nombre d'états explorés.
+
+    L'heuristique doit être admissible : h(état) <= coût_réel_restant(état -> but).
+    Une heuristique typique est la distance minimale sans fatigue depuis le sommet
+    courant jusqu'au but (calculée en pré-traitement par Dijkstra inversé).
+
+    """
+    # g[état] = meilleur temps connu depuis start jusqu'à état
+    g = {start: 0}
+    # f[état] = g[état] + h(état) : score total estimé
+    f_score = {start: heuristic(start)}
+
+    # File de priorité : (f_score, état)
+    priority_queue = [(f_score[start], start)]
+
+    while priority_queue:
+        current_f, current_state = heapq.heappop(priority_queue)
+
+        node, fatigue = current_state
+
+        # Si on atteint le sommet but, on retourne le temps réel (g, pas f)
+        if node == end_node:
+            return g[current_state]
+
+        # Ignorer les entrées obsolètes dans la file
+        if current_f > f_score.get(current_state, float('inf')):
+            continue
+
+        for neighbor_state, weight in self.neighbours(current_state):
+            tentative_g = g[current_state] + weight
+
+            if tentative_g < g.get(neighbor_state, float('inf')):
+                g[neighbor_state] = tentative_g
+                f_new = tentative_g + heuristic(neighbor_state)
+                f_score[neighbor_state] = f_new
+                heapq.heappush(priority_queue, (f_new, neighbor_state))
+
+    return float('inf')
