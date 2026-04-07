@@ -385,3 +385,84 @@ def astar(self, start, end_node, heuristic):
                 heapq.heappush(priority_queue, (f_new, neighbor_state))
 
     return float('inf')
+
+
+    def shortest_path_with_pruning_from_state(self, start_state, end_node):
+    """
+    Dijkstra avec pruning Pareto depuis un état initial (sommet, fatigue).
+ 
+    Retourne :
+        - le temps minimal pour atteindre end_node
+        - le meilleur état final (end_node, fatigue) atteint (fatigue minimale
+          parmi les états atteignant end_node avec le temps optimal)
+ 
+    Paramètres
+    ----------
+    start_state : tuple (sommet, fatigue_accumulée)
+        État de départ, avec la fatigue déjà accumulée lors des missions précédentes.
+    end_node : sommet
+        Sommet d'arrivée de la mission courante.
+ 
+    Retourne
+    --------
+    best_time : float
+        Temps minimal pour atteindre end_node. float('inf') si non atteignable.
+    best_state : tuple ou None
+        État (end_node, fatigue) correspondant au meilleur temps.
+        None si end_node n'est pas atteignable.
+    """
+    # best_for_node[sommet] = liste de (fatigue, temps) des états non dominés
+    best_for_node = {}
+ 
+    # File de priorité : (temps_cumulé, état)
+    priority_queue = [(0, start_state)]
+    distances = {start_state: 0}
+ 
+    while priority_queue:
+        current_time, current_state = heapq.heappop(priority_queue)
+ 
+        # Ignorer si on a trouvé mieux entre-temps
+        if current_time > distances.get(current_state, float('inf')):
+            continue
+ 
+        node, fatigue = current_state
+ 
+        # Vérification domination Pareto pour ce sommet
+        pareto_front = best_for_node.get(node, [])
+        dominated = any(f <= fatigue and t <= current_time for f, t in pareto_front)
+        if dominated:
+            continue
+ 
+        # Mise à jour du front de Pareto : on retire les états dominés par le courant
+        best_for_node[node] = [
+            (f, t) for f, t in pareto_front
+            if not (fatigue <= f and current_time <= t)
+        ]
+        best_for_node[node].append((fatigue, current_time))
+ 
+        # Exploration des voisins
+        for neighbor_state, weight in self.neighbours(current_state):
+            new_time = current_time + weight
+            if new_time < distances.get(neighbor_state, float('inf')):
+                distances[neighbor_state] = new_time
+                heapq.heappush(priority_queue, (new_time, neighbor_state))
+ 
+    # On cherche le meilleur temps parmi tous les états (end_node, *) atteints
+    best_time = float('inf')
+    best_state = None
+ 
+    for state, time in distances.items():
+        if state[0] == end_node and time < best_time:
+            best_time = time
+            best_state = state
+ 
+    # Parmi les états atteignant end_node avec best_time, on prend la fatigue minimale
+    # (critère de départage : minimiser la fatigue résiduelle pour les missions suivantes)
+    if best_state is not None:
+        min_fatigue = best_state[1]
+        for state, time in distances.items():
+            if state[0] == end_node and time == best_time and state[1] < min_fatigue:
+                min_fatigue = state[1]
+                best_state = state
+ 
+    return best_time, best_state

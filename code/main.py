@@ -67,3 +67,77 @@ def heuristic(state):
 
 temps_astar = graphe_implicite.astar(start_state, reseau.end, heuristic)
 print("Temps minimal (A*) :", temps_astar)
+
+def solve_multimission(network, missions):
+    """
+    Résout le problème de plusieurs missions enchaînées pour un seul agent.
+ 
+    L'agent démarre au point de départ de la première mission avec fatigue 0.
+    Il enchaîne les missions dans l'ordre imposé. La fatigue s'accumule sur
+    l'ensemble du trajet (y compris les déplacements entre missions).
+ 
+    Le temps total est la somme des temps de chaque segment :
+        - déplacement de v(i)_t à v(i+1)_s  (segment inter-mission)
+        - mission v(i+1)_s -> v(i+1)_t
+ 
+    Paramètres
+    ----------
+    network : Network
+        Le réseau routier.
+    missions : list of tuples (start, end)
+        Liste ordonnée des missions. Chaque mission est un couple (sommet_départ, sommet_arrivée).
+        Exemple : [('A', 'B'), ('C', 'D'), ('E', 'F')]
+ 
+    Retourne
+    --------
+    total_time : float
+        Temps total minimal pour accomplir toutes les missions dans l'ordre.
+        Retourne float('inf') si une mission est inatteignable.
+    mission_times : list of float
+        Temps de chaque segment (inter-mission + mission) dans l'ordre.
+    """
+    # Construction du graphe implicite avec fatigue (réutilisation de build_graph_implicit)
+    graphe_implicite = Network.build_graph_implicit(network)
+ 
+    # Monkey-patch de la méthode sur l'instance (ou l'appeler directement)
+    import types
+    graphe_implicite.shortest_path_with_pruning_from_state = types.MethodType(
+        shortest_path_with_pruning_from_state, graphe_implicite
+    )
+ 
+    total_time = 0.0
+    mission_times = []
+ 
+    # État initial : sommet de départ de la première mission, fatigue = 0
+    first_start, first_end = missions[0]
+    current_state = (first_start, 0)
+ 
+    for i, (ms, me) in enumerate(missions):
+        # --- Segment inter-mission : se déplacer jusqu'au départ de la mission i ---
+        # (pour i=0, current_state est déjà (ms, 0), donc pas de déplacement)
+        if current_state[0] != ms:
+            transit_time, current_state = graphe_implicite.shortest_path_with_pruning_from_state(
+                current_state, ms
+            )
+            if current_state is None:
+                print(f"Mission {i+1} : impossible d'atteindre le départ {ms}.")
+                return float('inf'), mission_times
+            total_time += transit_time
+            mission_times.append(('transit', ms, transit_time))
+ 
+        # --- Mission i : aller de ms à me ---
+        mission_time, current_state = graphe_implicite.shortest_path_with_pruning_from_state(
+            current_state, me
+        )
+ 
+        if current_state is None:
+            print(f"Mission {i+1} ({ms} -> {me}) : impossible à accomplir.")
+            return float('inf'), mission_times
+ 
+        total_time += mission_time
+        mission_times.append(('mission', f"{ms}->{me}", mission_time))
+        print(f"  Mission {i+1} ({ms} -> {me}) : temps = {mission_time:.2f} "
+              f"| fatigue accumulée = {current_state[1]}")
+ 
+    return total_time, mission_times
+ 
