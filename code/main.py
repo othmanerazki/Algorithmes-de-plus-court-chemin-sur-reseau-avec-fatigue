@@ -160,3 +160,15 @@ else:
 print("\nTop 5 des emplacements de repos :")
 for i, (sommet, temps) in enumerate(all_results[:5], 1):
     print(f"  {i}. Sommet {sommet:>6}  →  temps total = {temps}")
+
+
+from visualize import visualize_network, visualize_path
+
+# Utilise shortest_path_naïve car elle retourne aussi le dictionnaire precedent
+distances, precedent = graphe.shortest_path_naïve(reseau.start)
+
+# Génère les deux images
+visualize_network(reseau, output="network")
+visualize_path(reseau, precedent, reseau.start, reseau.end,
+               distances=distances, output="shortest_path")
+    

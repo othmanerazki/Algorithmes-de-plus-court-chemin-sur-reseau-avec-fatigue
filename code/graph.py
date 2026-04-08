@@ -466,3 +466,7 @@ def astar(self, start, end_node, heuristic):
                 best_state = state
  
     return best_time, best_state
+
+
+    apt install graphviz
+    
