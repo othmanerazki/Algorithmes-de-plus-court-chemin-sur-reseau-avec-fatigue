@@ -197,3 +197,92 @@ class Network:
         for voisin, longueur, fatigue in voisins:
             reversed_graph.setdefault(voisin, []).append((sommet, longueur))
     return Graph(reversed_graph)
+
+
+def build_reversed_implicit_graph(self):
+    """
+    Construit le graphe implicite étendu inversé du réseau.
+
+    Dans le graphe inversé étendu, une arête (u, Fu) → (v, Fv) du graphe
+    original devient (v, Fv) → (u, Fu) avec le même coût length × (1 + Fu).
+
+    Utile pour le calcul du point de repos optimal : un Dijkstra depuis
+    (vt, 0) sur ce graphe donne, pour chaque état (r, 0), le temps minimal
+    pour aller de r (fatigue 0) jusqu'à vt dans le graphe original.
+
+    Retourne
+    --------
+    GraphImplicit
+        Graphe implicite inversé étendu.
+    """
+    Fmax = sum(f for voisins in self._roads.values() for (_, _, f) in voisins)
+
+    def neighbours_fn_reversed(state):
+        node, F_node = state
+        result = []
+        for predecessor, voisins in self._roads.items():
+            for neighbor, length, fatigue_edge in voisins:
+                if neighbor != node:
+                    continue
+                F_pred = F_node - fatigue_edge
+                if F_pred < 0 or F_pred > Fmax:
+                    continue
+                cost = length * (1 + F_pred)
+                result.append(((predecessor, F_pred), cost))
+        return result
+
+    return GraphImplicit(neighbours_fn_reversed)
+
+
+    def find_optimal_rest_point(self):
+    """
+    Trouve le sommet optimal où placer un unique lieu de repos.
+
+    Le lieu de repos remet la fatigue de l'agent à zéro. On cherche le
+    sommet r minimisant T(r) = d_forward(r) + d_backward(r), où :
+        - d_forward(r)  = temps minimal de (vs, 0) à (r, *) dans le graphe étendu
+        - d_backward(r) = temps minimal de (r, 0) à (vt, *) = dist inversé depuis (vt, 0)
+
+    Complexité : O(m · Fmax · log(n · Fmax)) — deux passes de Dijkstra.
+
+    Retourne
+    --------
+    best_rest : sommet
+        Sommet optimal pour le lieu de repos.
+    best_time : float
+        Temps minimal avec lieu de repos.
+    time_without_rest : float
+        Temps minimal sans lieu de repos (référence).
+    results : list of (sommet, float)
+        Tous les candidats triés par temps total croissant.
+    """
+    # Passe aller : Dijkstra depuis (vs, 0)
+    implicit_graph = Network.build_graph_implicit(self)
+    dist_forward = implicit_graph.shortest_path((self.start, 0))
+
+    # Pour chaque sommet, temps minimal toutes fatigues confondues
+    d_forward = {}
+    for (node, f), dist in dist_forward.items():
+        if dist < d_forward.get(node, float('inf')):
+            d_forward[node] = dist
+
+    time_without_rest = d_forward.get(self.end, float('inf'))
+
+    # Passe retour : Dijkstra depuis (vt, 0) sur le graphe inversé
+    reversed_graph = self.build_reversed_implicit_graph()
+    dist_backward = reversed_graph.shortest_path((self.end, 0))
+
+    # d_backward(r) = dist_backward[(r, 0)] : l'agent repart de r avec fatigue 0
+    d_backward = {node: dist
+                  for (node, f), dist in dist_backward.items()
+                  if f == 0}
+
+    # Calcul de T(r) pour chaque candidat
+    results = sorted(
+        [(r, d_forward.get(r, float('inf')) + d_backward.get(r, float('inf')))
+         for r in self._roads],
+        key=lambda x: x[1]
+    )
+
+    best_rest, best_time = results[0] if results else (None, float('inf'))
+    return best_rest, best_time, time_without_rest, results

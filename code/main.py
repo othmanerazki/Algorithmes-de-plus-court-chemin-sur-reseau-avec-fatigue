@@ -141,3 +141,22 @@ def solve_multimission(network, missions):
  
     return total_time, mission_times
  
+
+ # Partie 3.3 : Extension — Point de repos optimal
+print("\n--- Extension : Point de repos ---")
+
+best_rest, best_time, time_without_rest, all_results = reseau.find_optimal_rest_point()
+
+print(f"Temps sans lieu de repos     : {time_without_rest}")
+print(f"Sommet optimal pour le repos : {best_rest}")
+print(f"Temps avec lieu de repos     : {best_time}")
+
+if best_time < time_without_rest:
+    gain = time_without_rest - best_time
+    print(f"Gain de temps               : {gain:.4f} ({100*gain/time_without_rest:.1f}%)")
+else:
+    print("Le lieu de repos n'améliore pas le temps (réseau sans fatigue).")
+
+print("\nTop 5 des emplacements de repos :")
+for i, (sommet, temps) in enumerate(all_results[:5], 1):
+    print(f"  {i}. Sommet {sommet:>6}  →  temps total = {temps}")
