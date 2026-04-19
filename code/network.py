@@ -2,18 +2,13 @@
 Module réseau : définit la classe Network représentant un environnement routier
 avec des longueurs et des coefficients de fatigue sur les routes.
 
-La classe Network permet de :
-    - Charger un réseau depuis un fichier texte structuré.
-    - Construire un graphe simple (sans fatigue) via Graph.
-    - Construire un graphe implicite (avec fatigue) via GraphImplicit.
-
 Format du fichier d'entrée
 --------------------------
-Première ligne : <nb_arêtes> <sommet_départ> <sommet_arrivée>
-Lignes suivantes (une par arête) : <sommet_i> <sommet_j> <longueur> <fatigue>
+Première ligne  : <nb_arêtes> <sommet_départ> <sommet_arrivée>
+Lignes suivantes: <sommet_i> <sommet_j> <longueur> <fatigue>
 """
 
-from graph import *
+from graph import Graph, GraphImplicit
 
 
 class Network:
@@ -23,266 +18,189 @@ class Network:
     Attributs
     ---------
     _roads : dict
-        Liste d'adjacence du réseau, de la forme :
-            roads[sommet] = [(voisin, longueur, fatigue), ...]
-        Exemple :
-            roads = {
-                sommet_0: [(sommet_1, 21, 2), (sommet_2, 12, 4)],
-                sommet_1: [(sommet_0, 74, 2), (sommet_2, 32, 1)],
-                ...
-            }
+        Liste d'adjacence : roads[sommet] = [(voisin, longueur, fatigue), ...]
     start : sommet
-        Sommet de départ du réseau.
+        Sommet de départ.
     end : sommet
-        Sommet d'arrivée du réseau.
+        Sommet d'arrivée.
     """
 
-    def __init__(self, roads={}, start=None, end=None):
-        """
-        Initialise le réseau depuis un dictionnaire de routes.
-
-        Paramètres
-        ----------
-        roads : dict, optionnel
-            Liste d'adjacence de la forme {sommet: [(voisin, longueur, fatigue), ...]}.
-            Par défaut, dictionnaire vide.
-        start : sommet, optionnel
-            Sommet de départ. Par défaut None.
-        end : sommet, optionnel
-            Sommet d'arrivée. Par défaut None.
-        """
-        self._roads = roads
+    def __init__(self, roads=None, start=None, end=None):
+        self._roads = roads if roads is not None else {}
         self.start = start
         self.end = end
 
     def __str__(self):
-        """
-        Retourne une représentation textuelle du réseau.
-
-        Retourne
-        --------
-        str
-            Chaîne décrivant le nombre de sommets et la liste d'adjacence complète.
-        """
-        output = f"A network with {len(self._roads)} nodes and the following adjacency list:\n"
-        return output + self._roads.__str__()
+        output = (f"Réseau avec {len(self._roads)} sommets :\n"
+                  f"  départ={self.start}, arrivée={self.end}\n")
+        for sommet, voisins in self._roads.items():
+            output += f"  {sommet} -> {voisins}\n"
+        return output
 
     @classmethod
     def from_file(cls, filename: str):
         """
-        Crée une instance de Network depuis un fichier de description de réseau.
+        Crée une instance de Network depuis un fichier texte.
 
-        Format du fichier : une arête par ligne (départ arrivée longueur fatigue).
-        Le graphe est construit comme non orienté : chaque arête est ajoutée
-        dans le sens i → j uniquement (le sens j → i doit être explicitement
-        présent dans le fichier si nécessaire).
-
-        Paramètres
-        ----------
-        filename : str
-            Chemin vers le fichier texte décrivant le réseau.
-
-        Retourne
-        --------
-        Network
-            Instance de Network chargée depuis le fichier.
+        Format : première ligne « nb_arêtes départ arrivée »,
+        puis une arête par ligne « i j longueur fatigue ».
         """
-        # Initialisation de la liste d'adjacence
         roads = {}
-        with open(filename, "r") as testcase:
-            # Lecture de la première ligne : nombre d'arêtes, départ, arrivée
-            nb, start, end = testcase.readline().strip().split()
+        with open(filename, "r") as f:
+            nb, start, end = f.readline().strip().split()
             for _ in range(int(nb)):
-                # Lecture de chaque arête : sommet i, sommet j, longueur, fatigue
-                i, j, l, f = testcase.readline().strip().split()
-                l, f = int(l), int(f)
-                # Ajout de l'arête i → j avec longueur et fatigue
-                roads.setdefault(i, []).append((j, l, f))
-                # Ajout de j comme sommet sans voisins s'il n'existe pas encore
+                i, j, l, fat = f.readline().strip().split()
+                l, fat = int(l), int(fat)
+                roads.setdefault(i, []).append((j, l, fat))
                 roads.setdefault(j, [])
         return cls(roads=roads, start=start, end=end)
 
     def build_simple_graph(self):
         """
-        Construit un objet Graph depuis le réseau en ignorant le coefficient de fatigue.
+        Construit un Graph en ignorant la fatigue (arêtes = (voisin, longueur)).
 
-        Pour chaque sommet, seules la destination et la longueur sont conservées ;
-        la fatigue est écartée. Le graphe retourné est compatible avec les algorithmes
-        de plus court chemin standards (Dijkstra).
+        Complexité : O(n + m).
 
         Retourne
         --------
         Graph
-            Instance de Graph dont les arêtes sont de la forme (voisin, longueur).
         """
         graph = {}
         for sommet, voisins in self._roads.items():
-            # On ignore le troisième élément (fatigue) de chaque tuple
-            graph[sommet] = [(a, b) for a, b, c in voisins]
+            graph[sommet] = [(v, l) for v, l, _ in voisins]
         return Graph(graph)
 
-    def build_graph_implicit(network):
+    def build_graph_implicit(self):
         """
-        Construit un GraphImplicit pour le réseau donné, en tenant compte de la fatigue.
+        Construit un GraphImplicit tenant compte de la fatigue.
 
-        Chaque état du graphe implicite est un couple (sommet, fatigue_accumulée).
-        Le coût d'une transition est : longueur × (1 + fatigue_courante),
-        ce qui pénalise les chemins parcourus avec une fatigue élevée.
-
-        Les états dont la fatigue dépasse Fmax (somme de toutes les fatigues du réseau)
-        sont ignorés, ce qui garantit la finitude de l'espace d'exploration.
-
-        Paramètres
-        ----------
-        network : Network
-            Le réseau routier depuis lequel construire le graphe implicite.
+        Chaque état est (sommet, fatigue_accumulée).
+        Coût d'une transition : longueur x (1 + fatigue_courante).
+        Les états dont la fatigue dépasse Fmax sont ignorés.
 
         Retourne
         --------
         GraphImplicit
-            Instance de GraphImplicit dont les voisins sont calculés à la volée.
         """
-        # Calcul de la fatigue maximale théorique : somme de toutes les fatigues du réseau
-        Fmax = sum(f for voisins in network._roads.values() for (_, _, f) in voisins)
+        Fmax = sum(f for voisins in self._roads.values() for (_, _, f) in voisins)
+        roads = self._roads
 
-        # Fonction de voisinage : retourne les voisins accessibles depuis un état (sommet, fatigue)
         def neighbours_fn(state):
-            """
-            Calcule les voisins d'un état (sommet, fatigue_accumulée).
-
-            Paramètres
-            ----------
-            state : tuple (sommet, fatigue_accumulée)
-                L'état courant dans le graphe étendu.
-
-            Retourne
-            --------
-            list
-                Liste de tuples ((voisin, nouvelle_fatigue), coût) représentant
-                les transitions accessibles depuis l'état courant.
-            """
             node, F = state
-            resultat = []
-            for neighbor, length, fatigue in network._roads.get(node, []):
-                # Calcul de la fatigue accumulée après emprunt de cette route
+            result = []
+            for neighbor, length, fatigue in roads.get(node, []):
                 new_F = F + fatigue
-                # On ignore les états dont la fatigue dépasse la borne maximale
                 if new_F > Fmax:
                     continue
-                etat_voisin = (neighbor, new_F)
-                # Coût de la transition : longueur pénalisée par la fatigue courante
                 cost = length * (1 + F)
-                resultat.append((etat_voisin, cost))
-            return resultat
+                result.append(((neighbor, new_F), cost))
+            return result
 
-        # Retourne l'objet GraphImplicit utilisant la fonction de voisinage définie ci-dessus
         return GraphImplicit(neighbours_fn)
 
     def build_reversed_simple_graph(self):
-    """
-    Construit le graphe simple inversé (arêtes retournées, sans fatigue).
+        """
+        Construit le graphe simple inversé (arêtes retournées, sans fatigue).
 
-    Utile pour le pré-traitement de l'heuristique A* : en faisant tourner
-    Dijkstra depuis vt sur ce graphe inversé, on obtient pour chaque sommet
-    sa distance minimale (sans fatigue) jusqu'à vt.
+        Utile pour le pré-traitement de A* : Dijkstra depuis vt sur ce graphe
+        donne la distance minimale (sans fatigue) de chaque sommet jusqu'à vt.
 
-    Retourne
-    --------
-    Graph
-        Graphe simple dont les arêtes sont retournées (j → i au lieu de i → j).
-    """
-    reversed_graph = {}
-    for sommet, voisins in self._roads.items():
-        reversed_graph.setdefault(sommet, [])
-        for voisin, longueur, fatigue in voisins:
-            reversed_graph.setdefault(voisin, []).append((sommet, longueur))
-    return Graph(reversed_graph)
+        Retourne
+        --------
+        Graph
+        """
+        reversed_graph = {sommet: [] for sommet in self._roads}
+        for sommet, voisins in self._roads.items():
+            for voisin, longueur, _ in voisins:
+                reversed_graph.setdefault(voisin, []).append((sommet, longueur))
+        return Graph(reversed_graph)
 
+    def build_reversed_implicit_graph(self):
+        """
+        Construit le graphe implicite étendu inversé.
 
-def build_reversed_implicit_graph(self):
-    """
-    Construit le graphe implicite étendu inversé du réseau.
+        Une arête (u, Fu) -> (v, Fv) du graphe original devient
+        (v, Fv) -> (u, Fu) avec le même coût length x (1 + Fu).
 
-    Dans le graphe inversé étendu, une arête (u, Fu) → (v, Fv) du graphe
-    original devient (v, Fv) → (u, Fu) avec le même coût length × (1 + Fu).
+        Utilisé pour find_optimal_rest_point : Dijkstra depuis (vt, 0)
+        sur ce graphe donne d_backward(r) = temps minimal de r (fatigue 0) a vt.
 
-    Utile pour le calcul du point de repos optimal : un Dijkstra depuis
-    (vt, 0) sur ce graphe donne, pour chaque état (r, 0), le temps minimal
-    pour aller de r (fatigue 0) jusqu'à vt dans le graphe original.
+        On précalcule la liste d'adjacence inversée pour éviter O(n.m)
+        à chaque appel de neighbours.
 
-    Retourne
-    --------
-    GraphImplicit
-        Graphe implicite inversé étendu.
-    """
-    Fmax = sum(f for voisins in self._roads.values() for (_, _, f) in voisins)
+        Retourne
+        --------
+        GraphImplicit
+        """
+        Fmax = sum(f for voisins in self._roads.values() for (_, _, f) in voisins)
 
-    def neighbours_fn_reversed(state):
-        node, F_node = state
-        result = []
-        for predecessor, voisins in self._roads.items():
-            for neighbor, length, fatigue_edge in voisins:
-                if neighbor != node:
-                    continue
-                F_pred = F_node - fatigue_edge
-                if F_pred < 0 or F_pred > Fmax:
-                    continue
-                cost = length * (1 + F_pred)
-                result.append(((predecessor, F_pred), cost))
-        return result
+        # Précalcul de la liste d'adjacence inversée étendue
+        reversed_adj = {}
+        for node in self._roads:
+            for neighbor, length, fatigue_edge in self._roads[node]:
+                for Fu in range(Fmax + 1):
+                    Fv = Fu + fatigue_edge
+                    if Fv > Fmax:
+                        continue
+                    cost = length * (1 + Fu)
+                    key = (neighbor, Fv)
+                    reversed_adj.setdefault(key, []).append(((node, Fu), cost))
 
-    return GraphImplicit(neighbours_fn_reversed)
+        def neighbours_fn_reversed(state):
+            return reversed_adj.get(state, [])
 
+        return GraphImplicit(neighbours_fn_reversed)
 
     def find_optimal_rest_point(self):
-    """
-    Trouve le sommet optimal où placer un unique lieu de repos.
+        """
+        Trouve le sommet optimal où placer un unique lieu de repos.
 
-    Le lieu de repos remet la fatigue de l'agent à zéro. On cherche le
-    sommet r minimisant T(r) = d_forward(r) + d_backward(r), où :
-        - d_forward(r)  = temps minimal de (vs, 0) à (r, *) dans le graphe étendu
-        - d_backward(r) = temps minimal de (r, 0) à (vt, *) = dist inversé depuis (vt, 0)
+        Le lieu de repos remet la fatigue a zéro. On cherche le sommet r
+        minimisant T(r) = d_forward(r) + d_backward(r), où :
+            - d_forward(r)  = temps minimal de (vs, 0) a (r, *) dans le graphe étendu
+            - d_backward(r) = temps minimal de (r, 0) a (vt, *)
+                            = distance inversée depuis (vt, 0)
 
-    Complexité : O(m · Fmax · log(n · Fmax)) — deux passes de Dijkstra.
+        Algorithme : 2 passes de Dijkstra.
+        Complexité : O(m . Fmax . log(n . Fmax)).
 
-    Retourne
-    --------
-    best_rest : sommet
-        Sommet optimal pour le lieu de repos.
-    best_time : float
-        Temps minimal avec lieu de repos.
-    time_without_rest : float
-        Temps minimal sans lieu de repos (référence).
-    results : list of (sommet, float)
-        Tous les candidats triés par temps total croissant.
-    """
-    # Passe aller : Dijkstra depuis (vs, 0)
-    implicit_graph = Network.build_graph_implicit(self)
-    dist_forward = implicit_graph.shortest_path((self.start, 0))
+        Retourne
+        --------
+        best_rest : sommet
+        best_time : float
+        time_without_rest : float
+        results : list of (sommet, float), triés par temps croissant
+        """
+        # Passe aller : Dijkstra depuis (vs, 0)
+        implicit_graph = self.build_graph_implicit()
+        dist_forward_full = implicit_graph.shortest_path((self.start, 0))
 
-    # Pour chaque sommet, temps minimal toutes fatigues confondues
-    d_forward = {}
-    for (node, f), dist in dist_forward.items():
-        if dist < d_forward.get(node, float('inf')):
-            d_forward[node] = dist
+        # d_forward[r] = min sur toutes les fatigues
+        d_forward = {}
+        for (node, f), dist in dist_forward_full.items():
+            if dist < d_forward.get(node, float('inf')):
+                d_forward[node] = dist
 
-    time_without_rest = d_forward.get(self.end, float('inf'))
+        time_without_rest = d_forward.get(self.end, float('inf'))
 
-    # Passe retour : Dijkstra depuis (vt, 0) sur le graphe inversé
-    reversed_graph = self.build_reversed_implicit_graph()
-    dist_backward = reversed_graph.shortest_path((self.end, 0))
+        # Passe retour : Dijkstra depuis (vt, 0) sur le graphe inversé
+        reversed_graph = self.build_reversed_implicit_graph()
+        dist_backward_full = reversed_graph.shortest_path((self.end, 0))
 
-    # d_backward(r) = dist_backward[(r, 0)] : l'agent repart de r avec fatigue 0
-    d_backward = {node: dist
-                  for (node, f), dist in dist_backward.items()
-                  if f == 0}
+        # d_backward[r] = dist depuis (r, 0) — l'agent repart avec fatigue 0
+        d_backward = {}
+        for (node, f), dist in dist_backward_full.items():
+            if f == 0:
+                d_backward[node] = dist
 
-    # Calcul de T(r) pour chaque candidat
-    results = sorted(
-        [(r, d_forward.get(r, float('inf')) + d_backward.get(r, float('inf')))
-         for r in self._roads],
-        key=lambda x: x[1]
-    )
+        # T(r) pour chaque candidat
+        results = sorted(
+            [
+                (r, d_forward.get(r, float('inf')) + d_backward.get(r, float('inf')))
+                for r in self._roads
+            ],
+            key=lambda x: x[1]
+        )
 
-    best_rest, best_time = results[0] if results else (None, float('inf'))
-    return best_rest, best_time, time_without_rest, results
+        best_rest, best_time = results[0] if results else (None, float('inf'))
+        return best_rest, best_time, time_without_rest, results
