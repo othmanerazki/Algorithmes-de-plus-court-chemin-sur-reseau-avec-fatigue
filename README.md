@@ -1,4 +1,4 @@
-# Plus Court Chemin sur un Réseau Routier avec Fatigue
+# Plus Court Chemin sur un Réseau avec Fatigue
 **ENSAE Paris — Projet de Programmation 2025–2026**  
 *Othmane Razki & Jean Palazuelo — Encadrant : Simon Mauras*
 
